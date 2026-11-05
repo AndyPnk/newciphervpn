@@ -40,6 +40,55 @@ SERVICE="civpnsvc"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
+# Конфіг VPN: створюється лише якщо його ще немає (існуючий не чіпаємо)
+CONFIG_DIR="/etc/xdg/Cipher/CiVPN_Client/Configs"
+CONFIG_FILE="${CONFIG_DIR}/DSNS.ovpn"
+
+ensure_config() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        log "VPN config already exists: $CONFIG_FILE"
+        return 0
+    fi
+
+    log "VPN config not found, creating $CONFIG_FILE"
+    mkdir -p "$CONFIG_DIR"
+
+    cat > "$CONFIG_FILE" <<'EOF'
+dev tun
+proto tcp
+remote-random
+resolv-retry 0
+remote 194.0.148.90 6290
+auth-nocache
+route-delay 3
+client
+ca dsns.p7b
+tls-client
+tls-cipher ECDHE-DSTU-GOST89-GOST95
+persist-key
+comp-lzo
+cipher dstu8845-512
+auth dstu7564-256
+ecdh-curve secp384r1
+tun-mtu 1500
+tun-mtu-extra 32
+#ocsp-check
+mssfix 1450
+ping-restart 0
+ping 0
+verb 3
+mute-replay-warnings
+reneg-sec 0
+auth-retry interact
+key-direction 1
+pkcs12 "/home/user/Стільниця/Pankiv_Andrii_Stepanovich.pfx"
+EOF
+
+    chmod 755 /etc/xdg/Cipher /etc/xdg/Cipher/CiVPN_Client "$CONFIG_DIR" 2>/dev/null || true
+    chmod 644 "$CONFIG_FILE"
+    log "VPN config created"
+}
+
 error() {
     log "[ERROR] $*"
     exit 1
@@ -98,7 +147,8 @@ INSTALLED_VERSION="$(cat "$VERSION_FILE" 2>/dev/null || true)"
 log "Installed version: ${INSTALLED_VERSION:-none}"
 
 if systemctl is-active --quiet "$SERVICE" && [[ "$INSTALLED_VERSION" == "$TARGET_VERSION" ]]; then
-    log "Already on ${TARGET_VERSION} and service is running. Nothing to do."
+    log "Already on ${TARGET_VERSION} and service is running."
+    ensure_config
     exit 0
 fi
 
@@ -314,6 +364,10 @@ if command -v civpnclient >/dev/null 2>&1; then
 else
     log "[WARNING] civpnclient command was not found in PATH"
 fi
+
+# ---------------- CONFIG ----------------
+
+ensure_config
 
 # ---------------- MARK SUCCESS ----------------
 
