@@ -168,7 +168,7 @@ chmod 700 "$INSTALLER"
 log "Starting automated installation (license: Y, configuration: 2 Global)"
 
 if ! python3 - "$INSTALLER" "$TIMEOUT" <<'PY'
-import os, sys, pty, select, time, signal, re
+import os, sys, pty, select, time, signal, re, fcntl, termios, struct
 
 installer = sys.argv[1]
 timeout = int(sys.argv[2])
@@ -177,11 +177,21 @@ ANSI = re.compile(rb'\x1b\[[0-9;?]*[A-Za-z]')
 
 pid, fd = pty.fork()
 if pid == 0:
+    # Zabbix не задає TERM: без нього падають tput/seq, а пейджер просить Enter
+    os.environ["TERM"] = "xterm"
+    os.environ["PAGER"] = "cat"
+    os.environ["MANPAGER"] = "cat"
+    os.environ["SYSTEMD_PAGER"] = ""
+    os.environ["LESS"] = "-FX"
     os.execv(installer, [installer])
+
+# Розмір терміналу: 24 рядки x 200 колонок
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 200, 0, 0))
 
 buffer = b""
 license_sent = False
 global_sent = False
+return_count = 0
 deadline = time.time() + timeout
 exit_status = None
 
@@ -236,6 +246,15 @@ try:
                 os.write(fd, b"2\r")
                 global_sent = True
                 print("\n[AUTOMATION] Global installation selected", flush=True)
+                buffer = b""
+
+            if global_sent and return_count < 20 and re.search(
+                rb'Press RETURN to continue', buffer, re.I
+            ):
+                time.sleep(0.5)
+                os.write(fd, b"\r")
+                return_count += 1
+                print("\n[AUTOMATION] Sent RETURN", flush=True)
                 buffer = b""
 
         res = os.waitpid(pid, os.WNOHANG)
