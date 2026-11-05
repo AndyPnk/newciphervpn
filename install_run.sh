@@ -231,8 +231,8 @@ try:
 
             elif license_sent and not global_sent and re.search(
                 rb'Globally for all users', buffer, re.I
-            ) and re.search(rb'(\]|:|\?)\s*$', buffer):
-                time.sleep(0.5)
+            ):
+                time.sleep(1)
                 os.write(fd, b"2\r")
                 global_sent = True
                 print("\n[AUTOMATION] Global installation selected", flush=True)
