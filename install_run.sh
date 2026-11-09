@@ -380,3 +380,4 @@ log "Service: ${SERVICE} ($(systemctl is-active "$SERVICE"))"
 log "=========================================="
 
 exit 0
+apt update -y
