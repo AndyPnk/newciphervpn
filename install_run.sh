@@ -12,6 +12,15 @@
 # Версія: /var/lib/cipher_vpn.version
 # ==========================================================
 
+# Якщо запущено через sh/dash (Zabbix) - перезапускаємо в bash
+if [ -z "${BASH_VERSION:-}" ]; then
+    if [ -r "$0" ]; then
+        exec bash "$0" "$@"
+    fi
+    echo "ERROR: run this script with bash, not sh"
+    exit 1
+fi
+
 set -Eeuo pipefail
 
 # ---------------- CONFIGURATION ----------------
@@ -215,6 +224,15 @@ chmod 700 "$INSTALLER"
 
 # ---------------- AUTOMATIC INSTALLATION ----------------
 
+# Зупиняємо сервіс і всі процеси клієнта, щоб у пам'яті не лишився старий код
+log "Stopping VPN service and client processes"
+systemctl stop "$SERVICE" 2>/dev/null || true
+pkill -x civpnclient 2>/dev/null || true
+sleep 2
+pkill -9 -f civpn 2>/dev/null || true
+sleep 1
+log "Remaining civpn processes: $(pgrep -fc civpn 2>/dev/null || true)"
+
 log "Starting automated installation (license: Y, configuration: 2 Global)"
 
 if ! python3 - "$INSTALLER" "$TIMEOUT" <<'PY'
@@ -380,4 +398,3 @@ log "Service: ${SERVICE} ($(systemctl is-active "$SERVICE"))"
 log "=========================================="
 
 exit 0
-apt update -y
