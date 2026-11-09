@@ -51,11 +51,23 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 # Конфіг VPN: створюється лише якщо його ще немає (існуючий не чіпаємо)
 CONFIG_DIR="/etc/xdg/Cipher/CiVPN_Client/Configs"
-CONFIG_FILE="${CONFIG_DIR}/DSNS.ovpn"
+CONFIG_FILE="${CONFIG_DIR}/dsns.civpn"
+
+LOGS_DIR="/etc/xdg/Cipher/CiVPN_Client/Logs"
 
 ensure_config() {
+    # Клієнт працює від звичайного користувача і пише логи в Logs:
+    # тека має існувати і бути доступною на запис усім (з sticky-бітом)
+    mkdir -p "$LOGS_DIR"
+    chmod 755 /etc/xdg/Cipher /etc/xdg/Cipher/CiVPN_Client 2>/dev/null || true
+    chmod 1777 "$LOGS_DIR"
+    log "Logs directory ready: $LOGS_DIR ($(stat -c '%a' "$LOGS_DIR"))"
+
     if [[ -f "$CONFIG_FILE" ]]; then
-        log "VPN config already exists: $CONFIG_FILE"
+        # Клієнт працює від звичайного користувача і зберігає в цей файл
+        # обраний сертифікат, тому йому потрібен запис (як у інсталятора: 666)
+        chmod 666 "$CONFIG_FILE"
+        log "VPN config already exists: $CONFIG_FILE (permissions set to 666)"
         return 0
     fi
 
@@ -90,11 +102,10 @@ mute-replay-warnings
 reneg-sec 0
 auth-retry interact
 key-direction 1
-pkcs12 "/home/user/Стільниця/Pankiv_Andrii_Stepanovich.pfx"
 EOF
 
     chmod 755 /etc/xdg/Cipher /etc/xdg/Cipher/CiVPN_Client "$CONFIG_DIR" 2>/dev/null || true
-    chmod 644 "$CONFIG_FILE"
+    chmod 666 "$CONFIG_FILE"
     log "VPN config created"
 }
 
